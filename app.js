@@ -50,12 +50,26 @@ function getJstNow() {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
 }
 
-function getTodayPath() {
+// 日付は "20260824" 形式(dateStr)と、<input type="date">用の "2026-08-24" 形式(iso)の
+// 2種類を行き来する。ファイルパスは常にdateStr、カレンダー部品の値は常にiso。
+function dateStrToday() {
   const jst = getJstNow();
   const y = jst.getFullYear();
   const m = String(jst.getMonth() + 1).padStart(2, "0");
   const d = String(jst.getDate()).padStart(2, "0");
-  return `${CONFIG.diaryDir}/${y}${m}${d}.md`;
+  return `${y}${m}${d}`;
+}
+
+function pathForDateStr(dateStr) {
+  return `${CONFIG.diaryDir}/${dateStr}.md`;
+}
+
+function dateStrToIso(dateStr) {
+  return `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
+}
+
+function isoToDateStr(iso) {
+  return iso.replace(/-/g, "");
 }
 
 function nowHHMM() {
@@ -63,9 +77,11 @@ function nowHHMM() {
   return `${String(jst.getHours()).padStart(2, "0")}:${String(jst.getMinutes()).padStart(2, "0")}`;
 }
 
-function todayLabel() {
-  const jst = getJstNow();
-  return `${jst.getFullYear()}/${jst.getMonth() + 1}/${jst.getDate()} の日記`;
+function dateLabelForStr(dateStr) {
+  const y = Number(dateStr.slice(0, 4));
+  const m = Number(dateStr.slice(4, 6));
+  const d = Number(dateStr.slice(6, 8));
+  return `${y}/${m}/${d} の日記`;
 }
 
 // ==== GitHub Contents API ====
@@ -150,7 +166,7 @@ setupSubmit.addEventListener("click", () => {
   }
   localStorage.setItem(STORAGE_KEYS.token, value);
   showScreen("main");
-  loadTodayIntoEditor();
+  loadDateIntoEditor(dateStrToday());
 });
 
 document.getElementById("settings-button").addEventListener("click", () => {
@@ -164,7 +180,7 @@ function routeToNextScreen() {
     showScreen("setup");
   } else {
     showScreen("main");
-    loadTodayIntoEditor();
+    loadDateIntoEditor(dateStrToday());
   }
 }
 
@@ -175,14 +191,21 @@ const statusMessage = document.getElementById("status-message");
 const todayLabelEl = document.getElementById("today-label");
 const micButton = document.getElementById("mic-button");
 const liveTranscript = document.getElementById("live-transcript");
+const datePicker = document.getElementById("date-picker");
+const todayJumpButton = document.getElementById("today-jump-button");
 
-todayLabelEl.textContent = todayLabel();
-
-// 今日のファイルのSHA(更新時に必要)。ファイルがまだ無ければ null のまま(=新規作成)。
+// 今読み込んでいる日のファイルのSHA(更新時に必要)。ファイルがまだ無ければ null(=新規作成)。
 let currentSha = null;
 let editorLoaded = false;
-let loadedPath = null; // 読み込んだ時点の「今日」のファイルパス。日付をまたいだ判定に使う
+let loadedPath = null; // 読み込んだ時点のファイルパス
+let selectedDateStr = null; // 今カレンダーで選ばれている日("20260824"形式)
+let loadedWasToday = false; // 読み込んだ時点で「今日」だったか(日付またぎの自動切り替え判定用)
 let dateRolloverWarned = false;
+let dirty = false; // 保存していない書きかけの内容があるか
+
+noteInput.addEventListener("input", () => {
+  dirty = true;
+});
 
 function showStatus(text, isError) {
   statusMessage.textContent = text;
@@ -190,7 +213,7 @@ function showStatus(text, isError) {
   statusMessage.style.color = isError ? "var(--error)" : "var(--ok)";
 }
 
-async function loadTodayIntoEditor() {
+async function loadDateIntoEditor(dateStr) {
   const token = localStorage.getItem(STORAGE_KEYS.token);
   if (!token) return;
   editorLoaded = false;
@@ -198,20 +221,24 @@ async function loadTodayIntoEditor() {
   noteInput.disabled = true;
   saveButton.disabled = true;
   noteInput.placeholder = "読み込み中...";
-  showStatus("今日の日記を読み込み中...", false);
+  showStatus("読み込み中...", false);
   try {
-    const path = getTodayPath();
+    const path = pathForDateStr(dateStr);
     const { exists, content, sha } = await fetchTodayFile(token, path);
     currentSha = sha;
     loadedPath = path;
+    selectedDateStr = dateStr;
+    loadedWasToday = dateStr === dateStrToday();
     noteInput.value = content;
     noteInput.placeholder = "思いついたことを書く、または下の「話す」ボタンで話しかけてください";
-    todayLabelEl.textContent = todayLabel();
+    todayLabelEl.textContent = dateLabelForStr(dateStr);
+    datePicker.value = dateStrToIso(dateStr);
+    dirty = false;
     editorLoaded = true;
     if (exists) {
-      showStatus("今日の日記を読み込みました。続きを書けます", false);
+      showStatus("この日の日記を読み込みました。続きを書けます", false);
     } else {
-      showStatus("今日の日記はまだありません。ここが最初の1行になります", false);
+      showStatus("この日の日記はまだありません。ここが最初の1行になります", false);
     }
   } catch (err) {
     editorLoaded = false;
@@ -219,7 +246,7 @@ async function loadTodayIntoEditor() {
     if (err.message === "AUTH") {
       showStatus("トークンが無効です。「設定を変える」から入れ直してください", true);
     } else {
-      showStatus(`今日の日記の読み込みに失敗しました: ${err.message || err}`, true);
+      showStatus(`日記の読み込みに失敗しました: ${err.message || err}`, true);
     }
   } finally {
     noteInput.disabled = false;
@@ -227,15 +254,31 @@ async function loadTodayIntoEditor() {
   }
 }
 
-saveButton.addEventListener("click", async () => {
-  if (!editorLoaded) {
-    showStatus("今日の日記をまだ読み込めていません。少し待つか、読み込みをやり直してください", true);
+datePicker.addEventListener("change", () => {
+  if (!datePicker.value) return;
+  if (dirty && !confirm("保存していない内容があります。このまま移動すると消えます。移動しますか?")) {
+    datePicker.value = dateStrToIso(selectedDateStr);
     return;
   }
-  // タブを開いたまま日付をまたいでいた場合も、読み込んだ時のファイル(=書いていた日)に
-  // ちゃんと保存する。書き換え中の内容を消してしまわないための処置。
+  loadDateIntoEditor(isoToDateStr(datePicker.value));
+});
+
+todayJumpButton.addEventListener("click", () => {
+  if (dirty && !confirm("保存していない内容があります。このまま移動すると消えます。移動しますか?")) {
+    return;
+  }
+  loadDateIntoEditor(dateStrToday());
+});
+
+saveButton.addEventListener("click", async () => {
+  if (!editorLoaded) {
+    showStatus("この日の日記をまだ読み込めていません。少し待つか、読み込みをやり直してください", true);
+    return;
+  }
+  // 「今日」を開いたままタブを開きっぱなしで日付をまたいだ場合も、読み込んだ時のファイル
+  // (=書いていた日)にちゃんと保存する。過去の日を選んで編集している時はこの判定はしない。
   const pathToSave = loadedPath;
-  const isRollover = getTodayPath() !== loadedPath;
+  const isRollover = loadedWasToday && dateStrToday() !== selectedDateStr;
   const content = noteInput.value;
   const token = localStorage.getItem(STORAGE_KEYS.token);
   saveButton.disabled = true;
@@ -243,9 +286,10 @@ saveButton.addEventListener("click", async () => {
   try {
     const result = await saveTodayFile(token, pathToSave, content, currentSha, `ふろ場日記: ${nowHHMM()}`);
     currentSha = result.content.sha; // 続けて保存できるよう最新のSHAに更新
+    dirty = false;
     if (isRollover) {
       showStatus("保存しました。日付が変わったので今日の日記に切り替えます...", false);
-      await loadTodayIntoEditor(); // 今日のファイルを読み込み直す(todayLabelも更新される)
+      await loadDateIntoEditor(dateStrToday());
     } else {
       showStatus("保存しました", false);
     }
@@ -282,8 +326,8 @@ function initSpeech() {
     liveTranscript.hidden = false;
     liveTranscript.textContent = text;
     if (e.results[e.results.length - 1].isFinal) {
-      const entry = `- ${nowHHMM()} ${text}`;
-      noteInput.value = buildAppendedContent(noteInput.value, entry);
+      noteInput.value = buildAppendedContent(noteInput.value, text);
+      dirty = true;
       liveTranscript.hidden = true;
       liveTranscript.textContent = "";
     }
@@ -316,8 +360,8 @@ function initSpeech() {
 
 // ==== 日付をまたいだらタブを開きっぱなしでも気づけるようにする ====
 setInterval(() => {
-  if (!editorLoaded || dateRolloverWarned || screens.main.hidden) return;
-  if (getTodayPath() !== loadedPath) {
+  if (!editorLoaded || !loadedWasToday || dateRolloverWarned || screens.main.hidden) return;
+  if (dateStrToday() !== selectedDateStr) {
     dateRolloverWarned = true;
     showStatus("日付が変わりました。保存すると自動で今日の日記に切り替わります", false);
   }

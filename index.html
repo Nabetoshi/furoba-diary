@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#10161F">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -34,6 +34,11 @@
   <h1>ふろ場日記</h1>
   <p class="hint" id="today-label"></p>
 
+  <div class="date-row">
+    <input type="date" id="date-picker">
+    <button id="today-jump-button" class="link-button">今日に戻る</button>
+  </div>
+
   <div id="live-transcript" class="live-transcript" hidden></div>
 
   <textarea id="note-input" rows="10" placeholder="読み込み中..."></textarea>
@@ -49,6 +54,6 @@
   <button id="settings-button" class="link-button">設定を変える</button>
 </section>
 
-<script src="app.js?v=7" defer></script>
+<script src="app.js?v=8" defer></script>
 </body>
 </html>

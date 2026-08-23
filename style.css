@@ -96,6 +96,25 @@ textarea:focus, input:focus {
   gap: 12px;
 }
 
+.date-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: -8px;
+}
+
+.date-row input[type="date"] {
+  width: auto;
+  padding: 10px 12px;
+  font-size: 1rem;
+}
+
+.date-row .link-button {
+  padding: 10px;
+  margin: 0;
+}
+
 .link-button {
   background: none;
   border: none;
