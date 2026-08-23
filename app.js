@@ -197,6 +197,7 @@ async function loadTodayIntoEditor() {
   dateRolloverWarned = false;
   noteInput.disabled = true;
   saveButton.disabled = true;
+  noteInput.placeholder = "読み込み中...";
   showStatus("今日の日記を読み込み中...", false);
   try {
     const path = getTodayPath();
@@ -204,15 +205,17 @@ async function loadTodayIntoEditor() {
     currentSha = sha;
     loadedPath = path;
     noteInput.value = content;
+    noteInput.placeholder = "思いついたことを書く、または下の「話す」ボタンで話しかけてください";
     todayLabelEl.textContent = todayLabel();
     editorLoaded = true;
     if (exists) {
       showStatus("今日の日記を読み込みました。続きを書けます", false);
     } else {
-      statusMessage.hidden = true;
+      showStatus("今日の日記はまだありません。ここが最初の1行になります", false);
     }
   } catch (err) {
     editorLoaded = false;
+    noteInput.placeholder = "読み込みに失敗しました。下のメッセージを確認してください";
     if (err.message === "AUTH") {
       showStatus("トークンが無効です。「設定を変える」から入れ直してください", true);
     } else {
