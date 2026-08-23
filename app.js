@@ -229,19 +229,23 @@ saveButton.addEventListener("click", async () => {
     showStatus("今日の日記をまだ読み込めていません。少し待つか、読み込みをやり直してください", true);
     return;
   }
-  const path = getTodayPath();
-  if (path !== loadedPath) {
-    showStatus("日付が変わったようです。保存する前にページを再読み込みしてください(このメモはまだ送信していません)", true);
-    return;
-  }
+  // タブを開いたまま日付をまたいでいた場合も、読み込んだ時のファイル(=書いていた日)に
+  // ちゃんと保存する。書き換え中の内容を消してしまわないための処置。
+  const pathToSave = loadedPath;
+  const isRollover = getTodayPath() !== loadedPath;
   const content = noteInput.value;
   const token = localStorage.getItem(STORAGE_KEYS.token);
   saveButton.disabled = true;
   saveButton.textContent = "保存中...";
   try {
-    const result = await saveTodayFile(token, path, content, currentSha, `ふろ場日記: ${nowHHMM()}`);
+    const result = await saveTodayFile(token, pathToSave, content, currentSha, `ふろ場日記: ${nowHHMM()}`);
     currentSha = result.content.sha; // 続けて保存できるよう最新のSHAに更新
-    showStatus("保存しました", false);
+    if (isRollover) {
+      showStatus("保存しました。日付が変わったので今日の日記に切り替えます...", false);
+      await loadTodayIntoEditor(); // 今日のファイルを読み込み直す(todayLabelも更新される)
+    } else {
+      showStatus("保存しました", false);
+    }
   } catch (err) {
     if (err.message === "CONFLICT") {
       showStatus("他の端末で更新されたようです。「設定を変える」→ 戻る、で読み込み直してください", true);
@@ -312,7 +316,7 @@ setInterval(() => {
   if (!editorLoaded || dateRolloverWarned || screens.main.hidden) return;
   if (getTodayPath() !== loadedPath) {
     dateRolloverWarned = true;
-    showStatus("日付が変わりました。保存する前にページを再読み込みしてください", true);
+    showStatus("日付が変わりました。保存すると自動で今日の日記に切り替わります", false);
   }
 }, 60000);
 
