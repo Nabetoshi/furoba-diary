@@ -328,6 +328,8 @@ function initSpeech() {
     if (e.results[e.results.length - 1].isFinal) {
       noteInput.value = buildAppendedContent(noteInput.value, text);
       dirty = true;
+      noteInput.scrollTop = noteInput.scrollHeight;
+      noteInput.setSelectionRange(noteInput.value.length, noteInput.value.length);
       liveTranscript.hidden = true;
       liveTranscript.textContent = "";
     }
