@@ -181,6 +181,8 @@ todayLabelEl.textContent = todayLabel();
 // 今日のファイルのSHA(更新時に必要)。ファイルがまだ無ければ null のまま(=新規作成)。
 let currentSha = null;
 let editorLoaded = false;
+let loadedPath = null; // 読み込んだ時点の「今日」のファイルパス。日付をまたいだ判定に使う
+let dateRolloverWarned = false;
 
 function showStatus(text, isError) {
   statusMessage.textContent = text;
@@ -192,6 +194,7 @@ async function loadTodayIntoEditor() {
   const token = localStorage.getItem(STORAGE_KEYS.token);
   if (!token) return;
   editorLoaded = false;
+  dateRolloverWarned = false;
   noteInput.disabled = true;
   saveButton.disabled = true;
   showStatus("今日の日記を読み込み中...", false);
@@ -199,7 +202,9 @@ async function loadTodayIntoEditor() {
     const path = getTodayPath();
     const { exists, content, sha } = await fetchTodayFile(token, path);
     currentSha = sha;
+    loadedPath = path;
     noteInput.value = content;
+    todayLabelEl.textContent = todayLabel();
     editorLoaded = true;
     if (exists) {
       showStatus("今日の日記を読み込みました。続きを書けます", false);
@@ -224,12 +229,16 @@ saveButton.addEventListener("click", async () => {
     showStatus("今日の日記をまだ読み込めていません。少し待つか、読み込みをやり直してください", true);
     return;
   }
+  const path = getTodayPath();
+  if (path !== loadedPath) {
+    showStatus("日付が変わったようです。保存する前にページを再読み込みしてください(このメモはまだ送信していません)", true);
+    return;
+  }
   const content = noteInput.value;
   const token = localStorage.getItem(STORAGE_KEYS.token);
   saveButton.disabled = true;
   saveButton.textContent = "保存中...";
   try {
-    const path = getTodayPath();
     const result = await saveTodayFile(token, path, content, currentSha, `ふろ場日記: ${nowHHMM()}`);
     currentSha = result.content.sha; // 続けて保存できるよう最新のSHAに更新
     showStatus("保存しました", false);
@@ -297,6 +306,15 @@ function initSpeech() {
     }
   });
 }
+
+// ==== 日付をまたいだらタブを開きっぱなしでも気づけるようにする ====
+setInterval(() => {
+  if (!editorLoaded || dateRolloverWarned || screens.main.hidden) return;
+  if (getTodayPath() !== loadedPath) {
+    dateRolloverWarned = true;
+    showStatus("日付が変わりました。保存する前にページを再読み込みしてください", true);
+  }
+}, 60000);
 
 // ==== 起動 ====
 if (localStorage.getItem(STORAGE_KEYS.authed) === "1") {
