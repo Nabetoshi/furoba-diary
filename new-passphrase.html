@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>合言葉のハッシュ値を作る(自分用ツール)</title>
+<style>
+  body { font-family: sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; }
+  input { width: 100%; font-size: 1.1rem; padding: 10px; margin: 8px 0; }
+  button { font-size: 1.1rem; padding: 10px 16px; }
+  code { display: block; background: #eee; padding: 12px; word-break: break-all; margin-top: 12px; }
+</style>
+</head>
+<body>
+<h1>合言葉のハッシュ値を作る</h1>
+<p>新しい合言葉を入力すると、下にハッシュ値が出ます。その値を <code>app.js</code> の <code>PASSPHRASE_HASH</code> にコピーして書き換えてください。このページ自体はネットに送信しません(ブラウザの中だけで計算します)。</p>
+<input type="text" id="input" placeholder="新しい合言葉">
+<button id="btn">ハッシュ値を作る</button>
+<code id="result"></code>
+
+<script>
+document.getElementById("btn").addEventListener("click", async () => {
+  const text = document.getElementById("input").value;
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  document.getElementById("result").textContent = hex;
+});
+</script>
+</body>
+</html>
