@@ -6,9 +6,9 @@ const CONFIG = {
   diaryDir: "Diary",
 };
 
-// 仮の合言葉「furoba」のSHA-256ハッシュ値。あとで自分の合言葉に変えたら、
-// このハッシュ値も new-passphrase.html (このリポジトリに同梱) で作り直して置き換える。
-const PASSPHRASE_HASH = "f5856827e89f6f656b6db5ecd70bf385c31bebf89361db93f5519153572d9708";
+// 合言葉のSHA-256ハッシュ値。変えたい時は new-passphrase.html (このリポジトリに同梱)
+// で作り直して置き換える。
+const PASSPHRASE_HASH = "77ba1e13197ae9cc08a59d7ce11f2a6ed36b6d60a81a8db7c72b89a78db6885e";
 
 const STORAGE_KEYS = {
   authed: "furoba_authed",
