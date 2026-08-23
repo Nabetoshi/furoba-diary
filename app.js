@@ -65,7 +65,7 @@ function nowHHMM() {
 
 function todayLabel() {
   const jst = getJstNow();
-  return `${jst.getFullYear()}/${jst.getMonth() + 1}/${jst.getDate()} の日記に追記します`;
+  return `${jst.getFullYear()}/${jst.getMonth() + 1}/${jst.getDate()} の日記`;
 }
 
 // ==== GitHub Contents API ====
@@ -150,6 +150,7 @@ setupSubmit.addEventListener("click", () => {
   }
   localStorage.setItem(STORAGE_KEYS.token, value);
   showScreen("main");
+  loadTodayIntoEditor();
 });
 
 document.getElementById("settings-button").addEventListener("click", () => {
@@ -163,6 +164,7 @@ function routeToNextScreen() {
     showScreen("setup");
   } else {
     showScreen("main");
+    loadTodayIntoEditor();
   }
 }
 
@@ -176,32 +178,64 @@ const liveTranscript = document.getElementById("live-transcript");
 
 todayLabelEl.textContent = todayLabel();
 
+// 今日のファイルのSHA(更新時に必要)。ファイルがまだ無ければ null のまま(=新規作成)。
+let currentSha = null;
+let editorLoaded = false;
+
 function showStatus(text, isError) {
   statusMessage.textContent = text;
   statusMessage.hidden = false;
   statusMessage.style.color = isError ? "var(--error)" : "var(--ok)";
 }
 
+async function loadTodayIntoEditor() {
+  const token = localStorage.getItem(STORAGE_KEYS.token);
+  if (!token) return;
+  editorLoaded = false;
+  noteInput.disabled = true;
+  saveButton.disabled = true;
+  showStatus("今日の日記を読み込み中...", false);
+  try {
+    const path = getTodayPath();
+    const { exists, content, sha } = await fetchTodayFile(token, path);
+    currentSha = sha;
+    noteInput.value = content;
+    editorLoaded = true;
+    if (exists) {
+      showStatus("今日の日記を読み込みました。続きを書けます", false);
+    } else {
+      statusMessage.hidden = true;
+    }
+  } catch (err) {
+    editorLoaded = false;
+    if (err.message === "AUTH") {
+      showStatus("トークンが無効です。「設定を変える」から入れ直してください", true);
+    } else {
+      showStatus(`今日の日記の読み込みに失敗しました: ${err.message || err}`, true);
+    }
+  } finally {
+    noteInput.disabled = false;
+    saveButton.disabled = false;
+  }
+}
+
 saveButton.addEventListener("click", async () => {
-  const text = noteInput.value.trim();
-  if (!text) {
-    showStatus("メモが空です", true);
+  if (!editorLoaded) {
+    showStatus("今日の日記をまだ読み込めていません。少し待つか、読み込みをやり直してください", true);
     return;
   }
+  const content = noteInput.value;
   const token = localStorage.getItem(STORAGE_KEYS.token);
   saveButton.disabled = true;
   saveButton.textContent = "保存中...";
   try {
     const path = getTodayPath();
-    const { content, sha } = await fetchTodayFile(token, path);
-    const entry = `- ${nowHHMM()} ${text}`;
-    const newContent = buildAppendedContent(content, entry);
-    await saveTodayFile(token, path, newContent, sha, `ふろ場日記: ${nowHHMM()}`);
-    noteInput.value = "";
+    const result = await saveTodayFile(token, path, content, currentSha, `ふろ場日記: ${nowHHMM()}`);
+    currentSha = result.content.sha; // 続けて保存できるよう最新のSHAに更新
     showStatus("保存しました", false);
   } catch (err) {
     if (err.message === "CONFLICT") {
-      showStatus("他の場所で更新されたようです。もう一度保存を押してください", true);
+      showStatus("他の端末で更新されたようです。「設定を変える」→ 戻る、で読み込み直してください", true);
     } else if (err.message === "AUTH") {
       showStatus("トークンが無効です。「設定を変える」から入れ直してください", true);
     } else {
@@ -232,8 +266,8 @@ function initSpeech() {
     liveTranscript.hidden = false;
     liveTranscript.textContent = text;
     if (e.results[e.results.length - 1].isFinal) {
-      const sep = noteInput.value && !noteInput.value.endsWith("\n") ? "\n" : "";
-      noteInput.value += sep + text;
+      const entry = `- ${nowHHMM()} ${text}`;
+      noteInput.value = buildAppendedContent(noteInput.value, entry);
       liveTranscript.hidden = true;
       liveTranscript.textContent = "";
     }
