@@ -166,7 +166,11 @@ setupSubmit.addEventListener("click", () => {
   }
   localStorage.setItem(STORAGE_KEYS.token, value);
   showScreen("main");
-  loadDateIntoEditor(dateStrToday());
+  // 書きかけの内容(保存に失敗した分など)があるときは、ここで読み込み直すと消えてしまうため触らない。
+  // 初めて開いた時や、書きかけが無い時だけ読み込む(=トークンを入れ直した後の再読み込みは行う)。
+  if (!editorLoaded || !dirty) {
+    loadDateIntoEditor(dateStrToday());
+  }
 });
 
 document.getElementById("settings-button").addEventListener("click", () => {
@@ -202,6 +206,7 @@ let selectedDateStr = null; // 今カレンダーで選ばれている日("20260
 let loadedWasToday = false; // 読み込んだ時点で「今日」だったか(日付またぎの自動切り替え判定用)
 let dateRolloverWarned = false;
 let dirty = false; // 保存していない書きかけの内容があるか
+let loadedContent = ""; // 読み込んだ時点の内容(コンフリクト時の自動マージに使う)
 
 noteInput.addEventListener("input", () => {
   dirty = true;
@@ -230,6 +235,7 @@ async function loadDateIntoEditor(dateStr) {
     selectedDateStr = dateStr;
     loadedWasToday = dateStr === dateStrToday();
     noteInput.value = content;
+    loadedContent = content;
     noteInput.placeholder = "思いついたことを書く、または下の「話す」ボタンで話しかけてください";
     todayLabelEl.textContent = dateLabelForStr(dateStr);
     datePicker.value = dateStrToIso(dateStr);
@@ -295,7 +301,7 @@ saveButton.addEventListener("click", async () => {
     }
   } catch (err) {
     if (err.message === "CONFLICT") {
-      showStatus("他の端末で更新されたようです。「設定を変える」→ 戻る、で読み込み直してください", true);
+      await handleConflict(token, pathToSave, content);
     } else if (err.message === "AUTH") {
       showStatus("トークンが無効です。「設定を変える」から入れ直してください", true);
     } else {
@@ -306,6 +312,41 @@ saveButton.addEventListener("click", async () => {
     saveButton.textContent = "保存する";
   }
 });
+
+// 他の端末で先に更新されていて保存できなかった時の処理。
+// 書きかけの内容を消さず、可能なら自動で合体させる。
+async function handleConflict(token, path, myContent) {
+  try {
+    const latest = await fetchTodayFile(token, path);
+    if (myContent === latest.content) {
+      // 中身は結局同じだった(相手が同じ内容を保存しただけ等)。番号だけ揃えれば解決。
+      currentSha = latest.sha;
+      loadedContent = latest.content;
+      dirty = false;
+      showStatus("他の端末の保存と内容が同じだったので、そのまま最新として扱いました", false);
+      return;
+    }
+    if (myContent.startsWith(loadedContent)) {
+      // 自分は「追記」しかしていない場合、その追記分を最新の内容の末尾にくっつける。
+      const added = myContent.slice(loadedContent.length);
+      const base = latest.content.replace(/\n+$/, "");
+      const merged = added.trim()
+        ? (base ? base + "\n\n" + added.replace(/^\n+/, "") : added)
+        : latest.content;
+      noteInput.value = merged;
+      currentSha = latest.sha;
+      loadedContent = latest.content;
+      dirty = true;
+      showStatus("他の端末の更新と、あなたが書いた分を自動で合体しました。内容を確認して、もう一度「保存する」を押してください", true);
+    } else {
+      // 追記だけではなく途中を書き換えていた等、安全に自動合体できないケース。
+      // 何も上書きせず、今書いている内容はそのまま画面に残す。
+      showStatus("他の端末で更新されていて自動では合体できませんでした。今書いている内容は消していません。念のため今の内容をどこかにコピーしてから、「今日」ボタンで読み込み直してください", true);
+    }
+  } catch (fetchErr) {
+    showStatus("他の端末で更新されたようですが、最新の内容を確認できませんでした。今書いている内容は消していません: " + (fetchErr.message || fetchErr), true);
+  }
+}
 
 // ==== 音声入力 ====
 function initSpeech() {
