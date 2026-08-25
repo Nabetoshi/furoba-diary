@@ -1,10 +1,13 @@
 // ==== バージョン ====
-// 更新するたびに数字を増やす。画面下部に表示され、
+// 更新するたびに数字を増やす。画面ごとに表示され、
 // 「今開いている画面が最新のコードかどうか」を目で確認できるようにするためのもの。
+// メモ入力画面はtextareaが長くスクロールしないと下の表示が見えないため、
+// class="version-footer" が付いた要素すべてに書き込む(複数箇所に表示する)。
 // (このscriptタグはdeferなのでDOMは既にパース済み。素直に書き込んでよい)
-const APP_VERSION = "v10 (2026-08-26)";
-const versionFooter = document.getElementById("version-footer");
-if (versionFooter) versionFooter.textContent = APP_VERSION;
+const APP_VERSION = "v11 (2026-08-26)";
+document.querySelectorAll(".version-footer").forEach((el) => {
+  el.textContent = APP_VERSION;
+});
 
 // ==== 設定 ====
 const CONFIG = {

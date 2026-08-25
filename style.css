@@ -157,3 +157,11 @@ textarea:focus, input:focus {
   padding: 4px 0 16px;
   opacity: 0.6;
 }
+
+/* メモ入力画面(main-screen)の上部用。下の共通フッターは
+   textareaが長いとスクロールしないと見えないため、こちらは
+   スクロール不要な位置(タイトル直下)に置く */
+.version-footer-inline {
+  padding: 0 0 4px;
+  margin: -8px 0 0;
+}
