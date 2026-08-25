@@ -1,3 +1,11 @@
+// ==== バージョン ====
+// 更新するたびに数字を増やす。画面下部に表示され、
+// 「今開いている画面が最新のコードかどうか」を目で確認できるようにするためのもの。
+// (このscriptタグはdeferなのでDOMは既にパース済み。素直に書き込んでよい)
+const APP_VERSION = "v10 (2026-08-26)";
+const versionFooter = document.getElementById("version-footer");
+if (versionFooter) versionFooter.textContent = APP_VERSION;
+
 // ==== 設定 ====
 const CONFIG = {
   owner: "Nabetoshi",

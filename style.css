@@ -149,3 +149,11 @@ textarea:focus, input:focus {
 #today-label {
   margin-top: -8px;
 }
+
+.version-footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.75rem;
+  padding: 4px 0 16px;
+  opacity: 0.6;
+}
