@@ -4,7 +4,7 @@
 // メモ入力画面はtextareaが長くスクロールしないと下の表示が見えないため、
 // class="version-footer" が付いた要素すべてに書き込む(複数箇所に表示する)。
 // (このscriptタグはdeferなのでDOMは既にパース済み。素直に書き込んでよい)
-const APP_VERSION = "v11 (2026-08-26)";
+const APP_VERSION = "v12 (2026-08-26)";
 document.querySelectorAll(".version-footer").forEach((el) => {
   el.textContent = APP_VERSION;
 });
@@ -135,7 +135,10 @@ async function saveTodayFile(token, path, newContent, sha, commitMessage) {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    if (res.status === 409) throw new Error("CONFLICT");
+    // 409だけでなく422も「他で更新されていた」時にGitHub側が返すことがある
+    // (例: こちらは「まだ無い」と思っていたファイルが実は既にできていた場合)。
+    // どちらも同じ「競合」として扱い、書きかけの内容を守る処理につなげる。
+    if (res.status === 409 || res.status === 422) throw new Error("CONFLICT");
     if (res.status === 401 || res.status === 403) throw new Error("AUTH");
     throw new Error(`保存失敗(${res.status})`);
   }
